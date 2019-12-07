@@ -36,14 +36,19 @@ pub enum Semantics {
     Position,
     #[sem(name = "color", repr = "[u8; 3]", wrapper = "VertexColor")]
     Color,
+    #[sem(name = "tex_coord", repr = "[f32; 2]", wrapper = "VertexTexCoord")]
+    TexCoord,
 }
 
+#[repr(C)]
 #[derive(Vertex)]
 #[vertex(sem = "Semantics")]
 struct Vertex {
     pos: VertexPosition,
     #[vertex(normalized = "true")]
     color: VertexColor,
+    #[vertex(normalized = "true")]
+    tex_coord: VertexTexCoord,
 }
 
 const WIDTH: u32 = 1280;
@@ -79,18 +84,22 @@ fn main() {
         Vertex {
             pos: VertexPosition::new(top_left),
             color: VertexColor::new([255, 0, 0]),
+            tex_coord: VertexTexCoord::new([0.0, 0.0]),
         },
         Vertex {
             pos: VertexPosition::new(top_right),
             color: VertexColor::new([0, 255, 0]),
+            tex_coord: VertexTexCoord::new([1.0, 0.0]),
         },
         Vertex {
             pos: VertexPosition::new(bot_right),
             color: VertexColor::new([0, 0, 255]),
+            tex_coord: VertexTexCoord::new([1.0, 1.0]),
         },
         Vertex {
             pos: VertexPosition::new(bot_left),
             color: VertexColor::new([255, 0, 255]),
+            tex_coord: VertexTexCoord::new([0.0, 1.0]),
         },
     ];
 
