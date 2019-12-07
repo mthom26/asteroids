@@ -9,3 +9,5 @@ edition = "2018"
 [dependencies]
 luminance = "0.37.1"
 luminance-glutin = "0.6.1"
+luminance-derive = "0.5.0"
+image = "0.22.3"
