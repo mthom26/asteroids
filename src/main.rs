@@ -12,7 +12,7 @@ use luminance::{
     pixel::{NormRGBA8UI, NormUnsigned},
     render_state::RenderState,
     shader::program::{Program, Uniform},
-    tess::{Mode, TessBuilder},
+    tess::{Mode, TessBuilder, Tess},
     texture::{Dim2, Flat, GenMipmaps, Sampler, Texture},
 };
 use luminance_derive::{Semantics, UniformInterface, Vertex};
@@ -54,6 +54,67 @@ struct Vertex {
 const WIDTH: u32 = 1280;
 const HEIGHT: u32 = 720;
 
+enum Tag {
+    Player,
+}
+
+struct GameObject {
+    quad: Tess,
+    tag: Tag,
+    pos: (f32, f32),
+}
+
+impl GameObject {
+    pub fn new(surface: &mut GlutinSurface, width: u32, height: u32, tag: Tag, pos: (f32, f32)) -> Self {
+        let (width, window_width) = (width as f32, WIDTH as f32);
+        let (height, window_height) = (height as f32, HEIGHT as f32);
+
+        let (top_left, top_right, bot_left, bot_right) = {
+            let top_left = [-(width / window_width) / 2.0, -(height / window_height) / 2.0];
+            let top_right = [(width / window_width) / 2.0, -(height / window_height) / 2.0];
+            let bot_right = [(width / window_width) / 2.0, (height / window_height) / 2.0];
+            let bot_left = [-(width  / window_width) / 2.0, (height / window_height) / 2.0];
+    
+            (top_left, top_right, bot_left, bot_right)
+        };
+        // println!("TL:{:?}, TR{:?}, BR{:?}, BL{:?}", top_left, top_right, bot_right, bot_left);
+        let vertices = [
+            Vertex {
+                pos: VertexPosition::new(top_left),
+                color: VertexColor::new([255, 0, 0]),
+                tex_coord: VertexTexCoord::new([0.0, 0.0]),
+            },
+            Vertex {
+                pos: VertexPosition::new(top_right),
+                color: VertexColor::new([0, 255, 0]),
+                tex_coord: VertexTexCoord::new([1.0, 0.0]),
+            },
+            Vertex {
+                pos: VertexPosition::new(bot_right),
+                color: VertexColor::new([0, 0, 255]),
+                tex_coord: VertexTexCoord::new([1.0, 1.0]),
+            },
+            Vertex {
+                pos: VertexPosition::new(bot_left),
+                color: VertexColor::new([255, 0, 255]),
+                tex_coord: VertexTexCoord::new([0.0, 1.0]),
+            },
+        ];
+
+        let quad = TessBuilder::new(surface)
+            .add_vertices(vertices)
+            .set_mode(Mode::TriangleFan)
+            .build()
+            .unwrap();
+        
+        GameObject {
+            quad,
+            tag,
+            pos
+        }
+    }
+}
+
 fn main() {
     let mut surface = GlutinSurface::new(
         WindowDim::Windowed(WIDTH, HEIGHT),
@@ -64,53 +125,14 @@ fn main() {
 
     let (tex, tex_width, tex_height) = load_texture(&mut surface, Path::new("assets/images/ship_01.png"));
 
-
     let program = Program::<Semantics, (), ShaderInterface>::from_strings(None, VS, None, FS)
         .expect("Could not create Program.")
         .ignore_warnings();
 
     let render_st = RenderState::default();
-
-    let (top_left, top_right, bot_left, bot_right) = {
-        let top_left = [-(tex_width as f32 / WIDTH as f32) / 2.0, -(tex_height as f32 / HEIGHT as f32) / 2.0];
-        let top_right = [(tex_width as f32 / WIDTH as f32) / 2.0, -(tex_height as f32 / HEIGHT as f32) / 2.0];
-        let bot_right = [(tex_width as f32 / WIDTH as f32) / 2.0, (tex_height as f32 / HEIGHT as f32) / 2.0];
-        let bot_left = [-(tex_width as f32 / WIDTH as f32) / 2.0, (tex_height as f32 / HEIGHT as f32) / 2.0];
-
-        (top_left, top_right, bot_left, bot_right)
-    };
-
-    let vertices = [
-        Vertex {
-            pos: VertexPosition::new(top_left),
-            color: VertexColor::new([255, 0, 0]),
-            tex_coord: VertexTexCoord::new([0.0, 0.0]),
-        },
-        Vertex {
-            pos: VertexPosition::new(top_right),
-            color: VertexColor::new([0, 255, 0]),
-            tex_coord: VertexTexCoord::new([1.0, 0.0]),
-        },
-        Vertex {
-            pos: VertexPosition::new(bot_right),
-            color: VertexColor::new([0, 0, 255]),
-            tex_coord: VertexTexCoord::new([1.0, 1.0]),
-        },
-        Vertex {
-            pos: VertexPosition::new(bot_left),
-            color: VertexColor::new([255, 0, 255]),
-            tex_coord: VertexTexCoord::new([0.0, 1.0]),
-        },
-    ];
-
-    println!("TL:{:?}, TR{:?}, BR{:?}, BL{:?}", top_left, top_right, bot_right, bot_left);
-
-    let quad = TessBuilder::new(&mut surface)
-        .add_vertices(vertices)
-        .set_mode(Mode::TriangleFan)
-        .build()
-        .unwrap();
     
+    let player = GameObject::new(&mut surface, tex_width, tex_height, Tag::Player, (0.0, 0.0));
+
     let back_buffer = surface.back_buffer().unwrap();
 
     let t_start = Instant::now();
@@ -152,7 +174,7 @@ fn main() {
                     iface.tex.update(&bound_tex);
 
                     rdr_gate.render(render_st, |mut tess_gate| {
-                        tess_gate.render(&quad);
+                        tess_gate.render(&player.quad);
                     });
                 });
             });
