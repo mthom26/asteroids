@@ -1,6 +1,6 @@
 use std::{
-    thread,
     path::Path,
+    thread,
     time::{Duration, Instant},
 };
 
@@ -8,11 +8,12 @@ use image;
 
 use luminance::{
     context::GraphicsContext,
+    linear::M44,
     pipeline::BoundTexture,
     pixel::{NormRGBA8UI, NormUnsigned},
     render_state::RenderState,
     shader::program::{Program, Uniform},
-    tess::{Mode, TessBuilder, Tess},
+    tess::{Mode, Tess, TessBuilder},
     texture::{Dim2, Flat, GenMipmaps, Sampler, Texture},
 };
 use luminance_derive::{Semantics, UniformInterface, Vertex};
@@ -21,6 +22,8 @@ use luminance_glutin::{
     WindowEvent, WindowOpt,
 };
 
+use cgmath::{Matrix4, Vector3};
+
 const VS: &'static str = include_str!("../assets/shaders/vertex.glsl");
 const FS: &'static str = include_str!("../assets/shaders/fragment.glsl");
 
@@ -28,6 +31,8 @@ const FS: &'static str = include_str!("../assets/shaders/fragment.glsl");
 struct ShaderInterface {
     // the 'static lifetime acts as “anything” here
     tex: Uniform<&'static BoundTexture<'static, Flat, Dim2, NormUnsigned>>,
+    #[uniform(unbound)]
+    transform: Uniform<M44>,
 }
 
 #[derive(Copy, Clone, Debug, Semantics)]
@@ -61,20 +66,26 @@ enum Tag {
 struct GameObject {
     quad: Tess,
     tag: Tag,
-    pos: (f32, f32),
+    pos: Vector3<f32>,
 }
 
 impl GameObject {
-    pub fn new(surface: &mut GlutinSurface, width: u32, height: u32, tag: Tag, pos: (f32, f32)) -> Self {
-        let (width, window_width) = (width as f32, WIDTH as f32);
-        let (height, window_height) = (height as f32, HEIGHT as f32);
+    pub fn new(
+        surface: &mut GlutinSurface,
+        width: u32,
+        height: u32,
+        tag: Tag,
+        pos: (f32, f32),
+    ) -> Self {
+        let (width, window_w) = (width as f32, WIDTH as f32);
+        let (height, window_h) = (height as f32, HEIGHT as f32);
 
         let (top_left, top_right, bot_left, bot_right) = {
-            let top_left = [-(width / window_width) / 2.0, -(height / window_height) / 2.0];
-            let top_right = [(width / window_width) / 2.0, -(height / window_height) / 2.0];
-            let bot_right = [(width / window_width) / 2.0, (height / window_height) / 2.0];
-            let bot_left = [-(width  / window_width) / 2.0, (height / window_height) / 2.0];
-    
+            let top_left = [-(width / window_w) / 2.0, -(height / window_h) / 2.0];
+            let top_right = [(width / window_w) / 2.0, -(height / window_h) / 2.0];
+            let bot_right = [(width / window_w) / 2.0, (height / window_h) / 2.0];
+            let bot_left = [-(width / window_w) / 2.0, (height / window_h) / 2.0];
+
             (top_left, top_right, bot_left, bot_right)
         };
         // println!("TL:{:?}, TR{:?}, BR{:?}, BL{:?}", top_left, top_right, bot_right, bot_left);
@@ -106,12 +117,10 @@ impl GameObject {
             .set_mode(Mode::TriangleFan)
             .build()
             .unwrap();
-        
-        GameObject {
-            quad,
-            tag,
-            pos
-        }
+
+        let pos = Vector3::new(pos.0, pos.1, 0.0);
+
+        GameObject { quad, tag, pos }
     }
 }
 
@@ -123,14 +132,15 @@ fn main() {
     )
     .expect("Could not create GlutinSurface.");
 
-    let (tex, tex_width, tex_height) = load_texture(&mut surface, Path::new("assets/images/ship_01.png"));
+    let (tex, tex_width, tex_height) =
+        load_texture(&mut surface, Path::new("assets/images/ship_01.png"));
 
     let program = Program::<Semantics, (), ShaderInterface>::from_strings(None, VS, None, FS)
         .expect("Could not create Program.")
         .ignore_warnings();
 
     let render_st = RenderState::default();
-    
+
     let player = GameObject::new(&mut surface, tex_width, tex_height, Tag::Player, (0.0, 0.0));
 
     let back_buffer = surface.back_buffer().unwrap();
@@ -165,19 +175,24 @@ fn main() {
         let background_color = [c, c, c, 1.0];
 
         // Rendering
-        surface
-            .pipeline_builder()
-            .pipeline(&back_buffer, background_color, |pipeline, mut shd_gate| {
+        surface.pipeline_builder().pipeline(
+            &back_buffer,
+            background_color,
+            |pipeline, mut shd_gate| {
                 let bound_tex = pipeline.bind_texture(&tex);
 
                 shd_gate.shade(&program, |iface, mut rdr_gate| {
+                    let transform = Matrix4::from_translation(player.pos);
+
                     iface.tex.update(&bound_tex);
+                    iface.transform.update(transform.into());
 
                     rdr_gate.render(render_st, |mut tess_gate| {
                         tess_gate.render(&player.quad);
                     });
                 });
-            });
+            },
+        );
 
         surface.swap_buffers();
 
@@ -189,7 +204,10 @@ fn main() {
     println!("Total frames rendered: {}", total_frames);
 }
 
-fn load_texture(surface: &mut GlutinSurface, path: &Path) -> (Texture<Flat, Dim2, NormRGBA8UI>, u32, u32) {
+fn load_texture(
+    surface: &mut GlutinSurface,
+    path: &Path,
+) -> (Texture<Flat, Dim2, NormRGBA8UI>, u32, u32) {
     let img = image::open(path)
         .map(|img| img.flipv().to_rgba())
         .expect("Could not create image.");
