@@ -22,7 +22,7 @@ use luminance_glutin::{
     WindowEvent, WindowOpt,
 };
 
-use cgmath::{Matrix4, Vector3};
+use cgmath::{InnerSpace, Matrix4, Vector3};
 
 const VS: &'static str = include_str!("../assets/shaders/vertex.glsl");
 const FS: &'static str = include_str!("../assets/shaders/fragment.glsl");
@@ -67,6 +67,8 @@ struct GameObject {
     quad: Tess,
     tag: Tag,
     pos: Vector3<f32>,
+    vel: Vector3<f32>,
+    acc: Vector3<f32>,
 }
 
 impl GameObject {
@@ -119,8 +121,54 @@ impl GameObject {
             .unwrap();
 
         let pos = Vector3::new(pos.0, pos.1, 0.0);
+        let vel = Vector3::new(0.0, 0.0, 0.0);
+        let acc = Vector3::new(0.0, 0.0, 0.0);
 
-        GameObject { quad, tag, pos }
+        GameObject {
+            quad,
+            tag,
+            pos,
+            vel,
+            acc,
+        }
+    }
+
+    pub fn update_acc(&mut self, acc: Vector3<f32>) {
+        if acc[0] != 0.0 || acc[1] != 0.0 {
+            self.acc = acc.normalize();
+        } else {
+            self.acc = Vector3::new(0.0, 0.0, 0.0);
+        }
+    }
+
+    pub fn update_vel(&mut self, delta: f32) {
+        self.vel += self.acc * delta;
+        if self.vel.magnitude() > 0.2 {
+            self.vel = self.vel.normalize() * 0.2;
+        }
+    }
+
+    pub fn update_pos(&mut self, delta: f32) {
+        self.pos += self.vel * delta;
+    }
+}
+
+#[derive(Debug)]
+struct PlayerInput {
+    pub up: bool,
+    pub down: bool,
+    pub left: bool,
+    pub right: bool,
+}
+
+impl PlayerInput {
+    pub fn new() -> Self {
+        PlayerInput {
+            up: false,
+            down: false,
+            left: false,
+            right: false,
+        }
     }
 }
 
@@ -141,12 +189,14 @@ fn main() {
 
     let render_st = RenderState::default();
 
-    let player = GameObject::new(&mut surface, tex_width, tex_height, Tag::Player, (0.0, 0.0));
-
     let back_buffer = surface.back_buffer().unwrap();
+
+    let mut player = GameObject::new(&mut surface, tex_width, tex_height, Tag::Player, (0.0, 0.0));
+    let mut input_manager = PlayerInput::new();
 
     let t_start = Instant::now();
     let mut total_frames: usize = 0;
+    let mut last_frametime = Instant::now();
 
     'app: loop {
         // Handle Input
@@ -164,6 +214,20 @@ fn main() {
                             },
                         ..
                     } => break 'app,
+                    WindowEvent::KeyboardInput { input, .. } => {
+                        let state = match input.state {
+                            ElementState::Pressed => true,
+                            ElementState::Released => false,
+                        };
+
+                        match input.virtual_keycode {
+                            Some(VirtualKeyCode::W) => input_manager.up = state,
+                            Some(VirtualKeyCode::S) => input_manager.down = state,
+                            Some(VirtualKeyCode::A) => input_manager.left = state,
+                            Some(VirtualKeyCode::D) => input_manager.right = state,
+                            _ => (),
+                        };
+                    }
                     _ => (),
                 }
             }
@@ -173,6 +237,27 @@ fn main() {
         let t = t_start.elapsed().as_millis() as f32 / 1000.0;
         let c = t.sin() * 0.05 + 0.15;
         let background_color = [c, c, c, 1.0];
+
+        let frametime = last_frametime.elapsed().as_millis() as f32 / 1000.0;
+        last_frametime = Instant::now();
+
+        // Update player
+        let mut updated_acc = Vector3::new(0.0, 0.0, 0.0);
+        if input_manager.up {
+            updated_acc[1] += 1.0
+        }
+        if input_manager.down {
+            updated_acc[1] -= 1.0
+        }
+        if input_manager.left {
+            updated_acc[0] -= 1.0
+        }
+        if input_manager.right {
+            updated_acc[0] += 1.0
+        }
+        player.update_acc(updated_acc);
+        player.update_vel(frametime);
+        player.update_pos(frametime);
 
         // Rendering
         surface.pipeline_builder().pipeline(
