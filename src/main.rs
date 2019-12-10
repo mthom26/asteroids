@@ -8,168 +8,33 @@ use image;
 
 use luminance::{
     context::GraphicsContext,
-    linear::M44,
-    pipeline::BoundTexture,
-    pixel::{NormRGBA8UI, NormUnsigned},
+    pixel::NormRGBA8UI,
     render_state::RenderState,
-    shader::program::{Program, Uniform},
-    tess::{Mode, Tess, TessBuilder},
+    shader::program::Program,
     texture::{Dim2, Flat, GenMipmaps, Sampler, Texture},
 };
-use luminance_derive::{Semantics, UniformInterface, Vertex};
 use luminance_glutin::{
     ElementState, Event, GlutinSurface, KeyboardInput, Surface, VirtualKeyCode, WindowDim,
     WindowEvent, WindowOpt,
 };
 
-use cgmath::{InnerSpace, Matrix4, Vector3};
+use cgmath::{Matrix4, Vector3};
+
+mod rendering;
+use rendering::{Semantics, ShaderInterface};
+mod game_object;
+use game_object::GameObject;
+mod input_manager;
+use input_manager::InputManager;
 
 const VS: &'static str = include_str!("../assets/shaders/vertex.glsl");
 const FS: &'static str = include_str!("../assets/shaders/fragment.glsl");
 
-#[derive(UniformInterface)]
-struct ShaderInterface {
-    // the 'static lifetime acts as “anything” here
-    tex: Uniform<&'static BoundTexture<'static, Flat, Dim2, NormUnsigned>>,
-    #[uniform(unbound)]
-    transform: Uniform<M44>,
-}
+pub const WIDTH: u32 = 1280;
+pub const HEIGHT: u32 = 720;
 
-#[derive(Copy, Clone, Debug, Semantics)]
-pub enum Semantics {
-    #[sem(name = "position", repr = "[f32; 2]", wrapper = "VertexPosition")]
-    Position,
-    #[sem(name = "color", repr = "[u8; 3]", wrapper = "VertexColor")]
-    Color,
-    #[sem(name = "tex_coord", repr = "[f32; 2]", wrapper = "VertexTexCoord")]
-    TexCoord,
-}
-
-#[repr(C)]
-#[derive(Vertex)]
-#[vertex(sem = "Semantics")]
-struct Vertex {
-    pos: VertexPosition,
-    #[vertex(normalized = "true")]
-    color: VertexColor,
-    #[vertex(normalized = "true")]
-    tex_coord: VertexTexCoord,
-}
-
-const WIDTH: u32 = 1280;
-const HEIGHT: u32 = 720;
-
-enum Tag {
+pub enum Tag {
     Player,
-}
-
-struct GameObject {
-    quad: Tess,
-    tag: Tag,
-    pos: Vector3<f32>,
-    vel: Vector3<f32>,
-    acc: Vector3<f32>,
-}
-
-impl GameObject {
-    pub fn new(
-        surface: &mut GlutinSurface,
-        width: u32,
-        height: u32,
-        tag: Tag,
-        pos: (f32, f32),
-    ) -> Self {
-        let (width, window_w) = (width as f32, WIDTH as f32);
-        let (height, window_h) = (height as f32, HEIGHT as f32);
-
-        let (top_left, top_right, bot_left, bot_right) = {
-            let top_left = [-(width / window_w) / 2.0, -(height / window_h) / 2.0];
-            let top_right = [(width / window_w) / 2.0, -(height / window_h) / 2.0];
-            let bot_right = [(width / window_w) / 2.0, (height / window_h) / 2.0];
-            let bot_left = [-(width / window_w) / 2.0, (height / window_h) / 2.0];
-
-            (top_left, top_right, bot_left, bot_right)
-        };
-        // println!("TL:{:?}, TR{:?}, BR{:?}, BL{:?}", top_left, top_right, bot_right, bot_left);
-        let vertices = [
-            Vertex {
-                pos: VertexPosition::new(top_left),
-                color: VertexColor::new([255, 0, 0]),
-                tex_coord: VertexTexCoord::new([0.0, 0.0]),
-            },
-            Vertex {
-                pos: VertexPosition::new(top_right),
-                color: VertexColor::new([0, 255, 0]),
-                tex_coord: VertexTexCoord::new([1.0, 0.0]),
-            },
-            Vertex {
-                pos: VertexPosition::new(bot_right),
-                color: VertexColor::new([0, 0, 255]),
-                tex_coord: VertexTexCoord::new([1.0, 1.0]),
-            },
-            Vertex {
-                pos: VertexPosition::new(bot_left),
-                color: VertexColor::new([255, 0, 255]),
-                tex_coord: VertexTexCoord::new([0.0, 1.0]),
-            },
-        ];
-
-        let quad = TessBuilder::new(surface)
-            .add_vertices(vertices)
-            .set_mode(Mode::TriangleFan)
-            .build()
-            .unwrap();
-
-        let pos = Vector3::new(pos.0, pos.1, 0.0);
-        let vel = Vector3::new(0.0, 0.0, 0.0);
-        let acc = Vector3::new(0.0, 0.0, 0.0);
-
-        GameObject {
-            quad,
-            tag,
-            pos,
-            vel,
-            acc,
-        }
-    }
-
-    pub fn update_acc(&mut self, acc: Vector3<f32>) {
-        if acc[0] != 0.0 || acc[1] != 0.0 {
-            self.acc = acc.normalize();
-        } else {
-            self.acc = Vector3::new(0.0, 0.0, 0.0);
-        }
-    }
-
-    pub fn update_vel(&mut self, delta: f32) {
-        self.vel += self.acc * delta;
-        if self.vel.magnitude() > 0.2 {
-            self.vel = self.vel.normalize() * 0.2;
-        }
-    }
-
-    pub fn update_pos(&mut self, delta: f32) {
-        self.pos += self.vel * delta;
-    }
-}
-
-#[derive(Debug)]
-struct PlayerInput {
-    pub up: bool,
-    pub down: bool,
-    pub left: bool,
-    pub right: bool,
-}
-
-impl PlayerInput {
-    pub fn new() -> Self {
-        PlayerInput {
-            up: false,
-            down: false,
-            left: false,
-            right: false,
-        }
-    }
 }
 
 fn main() {
@@ -192,7 +57,7 @@ fn main() {
     let back_buffer = surface.back_buffer().unwrap();
 
     let mut player = GameObject::new(&mut surface, tex_width, tex_height, Tag::Player, (0.0, 0.0));
-    let mut input_manager = PlayerInput::new();
+    let mut input_manager = InputManager::new();
 
     let t_start = Instant::now();
     let mut total_frames: usize = 0;
@@ -255,9 +120,7 @@ fn main() {
         if input_manager.right {
             updated_acc[0] += 1.0
         }
-        player.update_acc(updated_acc);
-        player.update_vel(frametime);
-        player.update_pos(frametime);
+        player.update(frametime, updated_acc);
 
         // Rendering
         surface.pipeline_builder().pipeline(
