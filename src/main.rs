@@ -18,7 +18,7 @@ use luminance_glutin::{
     WindowEvent, WindowOpt,
 };
 
-use cgmath::{Matrix4, Vector3};
+use ultraviolet::{mat::Mat4, vec::Vec3};
 
 mod rendering;
 use rendering::{Semantics, ShaderInterface};
@@ -26,6 +26,8 @@ mod game_object;
 use game_object::GameObject;
 mod input_manager;
 use input_manager::InputManager;
+mod utils;
+use utils::convert_mat4;
 
 const VS: &'static str = include_str!("../assets/shaders/vertex.glsl");
 const FS: &'static str = include_str!("../assets/shaders/fragment.glsl");
@@ -107,7 +109,7 @@ fn main() {
         last_frametime = Instant::now();
 
         // Update player
-        let mut updated_acc = Vector3::new(0.0, 0.0, 0.0);
+        let mut updated_acc = Vec3::new(0.0, 0.0, 0.0);
         if input_manager.up {
             updated_acc[1] += 1.0
         }
@@ -130,10 +132,10 @@ fn main() {
                 let bound_tex = pipeline.bind_texture(&tex);
 
                 shd_gate.shade(&program, |iface, mut rdr_gate| {
-                    let transform = Matrix4::from_translation(player.pos);
+                    let transform = Mat4::from_translation(player.pos);
 
                     iface.tex.update(&bound_tex);
-                    iface.transform.update(transform.into());
+                    iface.transform.update(convert_mat4(transform));
 
                     rdr_gate.render(render_st, |mut tess_gate| {
                         tess_gate.render(&player.quad);

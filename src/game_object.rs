@@ -3,16 +3,16 @@ use crate::Tag;
 use luminance::tess::{Mode, Tess, TessBuilder};
 use luminance_glutin::GlutinSurface;
 
-use cgmath::{InnerSpace, Vector3};
+use ultraviolet::vec::Vec3;
 
 use crate::rendering::Vertex;
 
 pub struct GameObject {
     pub quad: Tess,
     pub tag: Tag,
-    pub pos: Vector3<f32>,
-    pub vel: Vector3<f32>,
-    pub acc: Vector3<f32>,
+    pub pos: Vec3,
+    pub vel: Vec3,
+    pub acc: Vec3,
 }
 
 impl GameObject {
@@ -48,9 +48,9 @@ impl GameObject {
             .build()
             .unwrap();
 
-        let pos = Vector3::new(pos.0, pos.1, 0.0);
-        let vel = Vector3::new(0.0, 0.0, 0.0);
-        let acc = Vector3::new(0.0, 0.0, 0.0);
+        let pos = Vec3::new(pos.0, pos.1, 0.0);
+        let vel = Vec3::new(0.0, 0.0, 0.0);
+        let acc = Vec3::new(0.0, 0.0, 0.0);
 
         GameObject {
             quad,
@@ -61,18 +61,18 @@ impl GameObject {
         }
     }
 
-    fn update_acc(&mut self, acc: Vector3<f32>) {
+    fn update_acc(&mut self, acc: Vec3) {
         if acc[0] != 0.0 || acc[1] != 0.0 {
-            self.acc = acc.normalize();
+            self.acc = acc.normalized();
         } else {
-            self.acc = Vector3::new(0.0, 0.0, 0.0);
+            self.acc = Vec3::new(0.0, 0.0, 0.0);
         }
     }
 
     fn update_vel(&mut self, delta: f32) {
         self.vel += self.acc * delta;
-        if self.vel.magnitude() > 0.2 {
-            self.vel = self.vel.normalize() * 0.2;
+        if self.vel.mag() > 0.2 {
+            self.vel = self.vel.normalized() * 0.2;
         }
     }
 
@@ -81,7 +81,7 @@ impl GameObject {
     }
 
     // Convenience function to handle all updates
-    pub fn update(&mut self, delta: f32, acc: Vector3<f32>) {
+    pub fn update(&mut self, delta: f32, acc: Vec3) {
         self.update_acc(acc);
         self.update_vel(delta);
         self.update_pos(delta);
