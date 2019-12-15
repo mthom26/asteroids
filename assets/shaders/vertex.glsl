@@ -6,7 +6,9 @@ in vec2 tex_coord;
 // out vec3 v_color;
 out vec2 v_tex_coord;
 
-uniform mat4 transform;
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 proj;
 
 void main() {
   // v_color = color;
@@ -14,5 +16,5 @@ void main() {
   // 720 (screen height) / 64 (sprite height) = 11.25
   // v_uv = vec2(pos.x * 20.0 + 0.5, pos.y * 11.25 + 0.5);
   v_tex_coord = vec2(tex_coord.x, tex_coord.y);
-  gl_Position = transform * vec4(pos, 0.0, 1.0);
+  gl_Position = proj * view * model * vec4(pos, 0.0, 1.0);
 }

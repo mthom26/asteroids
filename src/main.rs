@@ -4,15 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use image;
-
-use luminance::{
-    context::GraphicsContext,
-    pixel::NormRGBA8UI,
-    render_state::RenderState,
-    shader::program::Program,
-    texture::{Dim2, Flat, GenMipmaps, Sampler, Texture},
-};
+use luminance::{context::GraphicsContext, render_state::RenderState, shader::program::Program};
 use luminance_glutin::{
     ElementState, Event, GlutinSurface, KeyboardInput, Surface, VirtualKeyCode, WindowDim,
     WindowEvent, WindowOpt,
@@ -27,7 +19,9 @@ use game_object::GameObject;
 mod input_manager;
 use input_manager::InputManager;
 mod utils;
-use utils::convert_mat4;
+use utils::{convert_mat4, load_texture};
+mod camera;
+use camera::Camera;
 
 const VS: &'static str = include_str!("../assets/shaders/vertex.glsl");
 const FS: &'static str = include_str!("../assets/shaders/fragment.glsl");
@@ -47,7 +41,7 @@ fn main() {
     )
     .expect("Could not create GlutinSurface.");
 
-    let (tex, tex_width, tex_height) =
+    let (tex, _tex_width, _tex_height) =
         load_texture(&mut surface, Path::new("assets/images/ship_01.png"));
 
     let program = Program::<Semantics, (), ShaderInterface>::from_strings(None, VS, None, FS)
@@ -58,8 +52,12 @@ fn main() {
 
     let back_buffer = surface.back_buffer().unwrap();
 
-    let mut player = GameObject::new(&mut surface, tex_width, tex_height, Tag::Player, (0.0, 0.0));
+    let mut player = GameObject::new(&mut surface, Tag::Player, (0.0, 0.0), 0.075);
     let mut input_manager = InputManager::new();
+
+    // Calculate camera matrices here as the camera won't be moving
+    let cam = Camera::default();
+    let (view_matrix, proj_matrix) = cam.get_matrices();
 
     let t_start = Instant::now();
     let mut total_frames: usize = 0;
@@ -117,10 +115,10 @@ fn main() {
             updated_acc[1] -= 1.0
         }
         if input_manager.left {
-            updated_acc[0] -= 1.0
+            updated_acc[0] += 1.0
         }
         if input_manager.right {
-            updated_acc[0] += 1.0
+            updated_acc[0] -= 1.0
         }
         player.update(frametime, updated_acc);
 
@@ -135,7 +133,9 @@ fn main() {
                     let transform = Mat4::from_translation(player.pos);
 
                     iface.tex.update(&bound_tex);
-                    iface.transform.update(convert_mat4(transform));
+                    iface.model.update(convert_mat4(transform));
+                    iface.view.update(view_matrix);
+                    iface.proj.update(proj_matrix);
 
                     rdr_gate.render(render_st, |mut tess_gate| {
                         tess_gate.render(&player.quad);
@@ -152,23 +152,4 @@ fn main() {
     }
 
     println!("Total frames rendered: {}", total_frames);
-}
-
-fn load_texture(
-    surface: &mut GlutinSurface,
-    path: &Path,
-) -> (Texture<Flat, Dim2, NormRGBA8UI>, u32, u32) {
-    let img = image::open(path)
-        .map(|img| img.flipv().to_rgba())
-        .expect("Could not create image.");
-
-    let (width, height) = img.dimensions();
-    let texels = img.into_raw();
-
-    let tex = Texture::new(surface, [width, height], 0, Sampler::default())
-        .expect("Failed to create Texture.");
-
-    tex.upload_raw(GenMipmaps::No, &texels).unwrap();
-
-    (tex, width, height)
 }
