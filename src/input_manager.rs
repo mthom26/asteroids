@@ -4,6 +4,7 @@ pub struct InputManager {
     pub down: bool,
     pub left: bool,
     pub right: bool,
+    pub mouse_pos: (f32, f32),
 }
 
 impl InputManager {
@@ -13,6 +14,7 @@ impl InputManager {
             down: false,
             left: false,
             right: false,
+            mouse_pos: (0.0, 0.0),
         }
     }
 }

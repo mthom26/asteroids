@@ -93,6 +93,10 @@ fn main() {
                             _ => (),
                         };
                     }
+                    // Update mouse position
+                    WindowEvent::CursorMoved { position, .. } => {
+                        input_manager.mouse_pos = (position.x as f32, position.y as f32)
+                    }
                     _ => (),
                 }
             }
@@ -115,11 +119,18 @@ fn main() {
             updated_acc[1] -= 1.0
         }
         if input_manager.left {
-            updated_acc[0] += 1.0
-        }
-        if input_manager.right {
             updated_acc[0] -= 1.0
         }
+        if input_manager.right {
+            updated_acc[0] += 1.0
+        }
+
+        // Mouse position to world coordinate
+        let (mouse_x, mouse_y) = (
+            (input_manager.mouse_pos.0 / WIDTH as f32 * 2.0 - 1.0) * WIDTH as f32 / HEIGHT as f32,
+            (input_manager.mouse_pos.1 / HEIGHT as f32 * 2.0 - 1.0),
+        );
+
         player.update(frametime, updated_acc);
 
         // Rendering

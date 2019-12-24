@@ -7,7 +7,6 @@ pub struct Camera {
     pub look_at: Vec3,
     pub up: Vec3,
     pub aspect_ratio: f32,
-    pub fov: f32,
     pub clip_near: f32,
     pub clip_far: f32,
 }
@@ -17,17 +16,14 @@ impl Camera {
         pos: Vec3,
         look_at: Vec3,
         up: Vec3,
-        fov: f32,
         aspect_ratio: f32,
         clip_near: f32,
         clip_far: f32,
     ) -> Self {
-        let fov = fov.to_radians();
         Camera {
             pos,
             look_at,
             up,
-            fov,
             aspect_ratio,
             clip_near,
             clip_far,
@@ -55,11 +51,10 @@ impl Camera {
 impl Default for Camera {
     fn default() -> Self {
         Camera {
-            pos: Vec3::new(0.0, 0.0, -1.0),
+            pos: Vec3::new(0.0, 0.0, 1.0),
             look_at: Vec3::new(0.0, 0.0, 0.0),
             up: Vec3::new(0.0, 1.0, 0.0),
             aspect_ratio: 16.0 / 9.0,
-            fov: (45.0 as f32).to_radians(),
             clip_near: 0.1,
             clip_far: 100.0,
         }
