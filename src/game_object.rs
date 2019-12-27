@@ -59,10 +59,10 @@ impl GameObject {
     fn update_rot(&mut self, target_pos: Vec3, delta: f32) {
         let target = (target_pos - self.pos).normalized();
         let rot = Rotor3::from_rotation_xy(self.rot);
-        let mut current = Vec3::new(0.0, -1.0, 0.0);
+        let mut current = Vec3::new(0.0, 1.0, 0.0);
         current.rotate_by(rot);
 
-        let target_rot = Rotor3::from_rotation_between(current, target);
+        let target_rot = Rotor3::from_rotation_between(target, current);
         let target_rot = 2.0 * target_rot.bv.xy.asin();
         // println!("{}", target_rot);
 
