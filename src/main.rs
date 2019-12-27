@@ -10,7 +10,7 @@ use luminance_glutin::{
     WindowEvent, WindowOpt,
 };
 
-use ultraviolet::{mat::Mat4, vec::Vec3};
+use ultraviolet::{rotor::Rotor3, transform::Similarity3, vec::Vec3};
 
 mod rendering;
 use rendering::{Semantics, ShaderInterface};
@@ -113,25 +113,27 @@ fn main() {
         // Update player
         let mut updated_acc = Vec3::new(0.0, 0.0, 0.0);
         if input_manager.up {
-            updated_acc[1] += 1.0
+            updated_acc[1] += 1.0;
         }
         if input_manager.down {
-            updated_acc[1] -= 1.0
+            updated_acc[1] -= 1.0;
         }
         if input_manager.left {
-            updated_acc[0] -= 1.0
+            updated_acc[0] -= 1.0;
         }
         if input_manager.right {
-            updated_acc[0] += 1.0
+            updated_acc[0] += 1.0;
         }
 
         // Mouse position to world coordinate
-        let (mouse_x, mouse_y) = (
+        let mouse_pos = Vec3::new(
             (input_manager.mouse_pos.0 / WIDTH as f32 * 2.0 - 1.0) * WIDTH as f32 / HEIGHT as f32,
-            (input_manager.mouse_pos.1 / HEIGHT as f32 * 2.0 - 1.0),
+            -(input_manager.mouse_pos.1 / HEIGHT as f32 * 2.0 - 1.0),
+            0.0,
         );
 
-        player.update(frametime, updated_acc);
+        // Update player with acceleration and rotate towards mouse position
+        player.update(frametime, updated_acc, mouse_pos);
 
         // Rendering
         surface.pipeline_builder().pipeline(
@@ -141,10 +143,15 @@ fn main() {
                 let bound_tex = pipeline.bind_texture(&tex);
 
                 shd_gate.shade(&program, |iface, mut rdr_gate| {
-                    let transform = Mat4::from_translation(player.pos);
+                    let rot = Rotor3::from_rotation_xy(player.rot);
+
+                    let mut sim = Similarity3::identity();
+                    sim.prepend_rotation(rot);
+                    sim.append_translation(player.pos);
+                    let sim = sim.into_homogeneous_matrix();
 
                     iface.tex.update(&bound_tex);
-                    iface.model.update(convert_mat4(transform));
+                    iface.model.update(convert_mat4(sim));
                     iface.view.update(view_matrix);
                     iface.proj.update(proj_matrix);
 
