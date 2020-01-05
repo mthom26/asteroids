@@ -4,7 +4,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-use luminance::{context::GraphicsContext, render_state::RenderState, shader::program::Program};
+use luminance::{
+    context::GraphicsContext, pipeline::PipelineState, render_state::RenderState,
+    shader::program::Program,
+};
 use luminance_glutin::{
     ElementState, Event, GlutinSurface, KeyboardInput, Surface, VirtualKeyCode, WindowDim,
     WindowEvent, WindowOpt,
@@ -138,7 +141,7 @@ fn main() {
         // Rendering
         surface.pipeline_builder().pipeline(
             &back_buffer,
-            background_color,
+            &PipelineState::default().set_clear_color(background_color),
             |pipeline, mut shd_gate| {
                 let bound_tex = pipeline.bind_texture(&tex);
 
@@ -155,7 +158,7 @@ fn main() {
                     iface.view.update(view_matrix);
                     iface.proj.update(proj_matrix);
 
-                    rdr_gate.render(render_st, |mut tess_gate| {
+                    rdr_gate.render(&render_st, |mut tess_gate| {
                         tess_gate.render(&player.quad);
                     });
                 });
